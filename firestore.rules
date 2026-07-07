@@ -1,0 +1,23 @@
+// ============================================================
+// REGLAS DE SEGURIDAD DE FIRESTORE
+// ============================================================
+// Copia esto en: Firebase Console > Firestore Database > Reglas
+//
+// Esta versión usa una "clave de acceso" simple guardada en el navegador
+// (mismo patrón simple que muchas apps de un solo usuario). No es
+// autenticación robusta, pero evita que alguien con el link random
+// lea o escriba en tu base de datos sin conocer la app.
+//
+// Si más adelante quieres agregar a otra persona (ej. un encargado),
+// lo mejor es migrar a Firebase Authentication (login con correo/contraseña).
+// Te ayudo con eso cuando lo necesites.
+// ============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.time < timestamp.date(2027, 12, 31);
+    }
+  }
+}
