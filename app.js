@@ -729,9 +729,43 @@ function stickyCardHtml(nota){
     inner = `<textarea class="sticky-texto" data-notatexto="${nota.id}" placeholder="Escribe aquí...">${escapeHtml(nota.contenido)}</textarea>`;
   }
   return `<div class="sticky-note" style="background:${nota.color||'#F2E14C'};transform:rotate(${rot}deg);">
+    <div class="sticky-share" data-sharenota="${nota.id}" title="Compartir">↗</div>
     <div class="sticky-del" data-delnota="${nota.id}">✕</div>
     ${inner}
   </div>`;
+}
+
+function buildShareText(nota){
+  const fmt = n => "$" + Number(n||0).toLocaleString('es-MX',{minimumFractionDigits:2, maximumFractionDigits:2});
+  if (nota.tipo === "checklist"){
+    let text = `📋 ${nota.titulo||"Lista"}\n\n`;
+    (nota.items||[]).forEach(it=> text += `${it.done?"✅":"⬜"} ${it.text}\n`);
+    text += `\n— Bitácora del dueño`;
+    return text;
+  }
+  if (nota.tipo === "gasto"){
+    const lineTotal = it => Number(it.monto||0) * (Number(it.cantidad) || 1);
+    const total = (nota.items||[]).reduce((s,it)=> s+lineTotal(it), 0);
+    let text = `💰 ${nota.titulo||"Gastos"}\nTotal: ${fmt(total)}\n\n`;
+    (nota.items||[]).forEach(it=>{
+      const showQty = it.cantidad && Number(it.cantidad) !== 1;
+      text += `${fmt(lineTotal(it))}${showQty?` (${fmt(it.monto)} × ${it.cantidad})`:""} — ${it.descripcion||""}${it.fecha?` (${it.fecha})`:""}\n`;
+    });
+    text += `\n— Bitácora del dueño`;
+    return text;
+  }
+  return `📝 ${nota.contenido||""}\n\n— Bitácora del dueño`;
+}
+
+async function shareNota(id){
+  const nota = notasList.find(n=>n.id===id);
+  if (!nota) return;
+  const text = buildShareText(nota);
+  if (navigator.share){
+    try{ await navigator.share({text}); } catch(e){ /* cancelado por el usuario */ }
+  } else {
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+  }
 }
 
 function renderNotas(){
@@ -850,6 +884,9 @@ function render(){
     document.getElementById("btnAddNota").addEventListener("click", addNota);
     content.querySelectorAll("[data-delnota]").forEach(el=>{
       el.addEventListener("click", ()=> deleteNota(el.dataset.delnota));
+    });
+    content.querySelectorAll("[data-sharenota]").forEach(el=>{
+      el.addEventListener("click", ()=> shareNota(el.dataset.sharenota));
     });
     content.querySelectorAll(".sticky-item").forEach(el=>{
       el.addEventListener("click", ()=> toggleChecklistItem(el.dataset.notaid, parseInt(el.dataset.itemidx,10)));
