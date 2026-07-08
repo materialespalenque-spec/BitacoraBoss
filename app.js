@@ -136,12 +136,17 @@ updateStatus();
 // ============================================================
 // Firestore: suscripción dinámica por periodo navegado
 // ============================================================
+function isTypingIn(ids){
+  const el = document.activeElement;
+  return el && ids.includes(el.id);
+}
+
 function subscribeAgenda(freq){
   if (unsub[freq]) unsub[freq]();
   const key = getKey(freq, viewDates[freq]);
   unsub[freq] = db.collection("agenda").doc(`${freq}_${key}`).onSnapshot(doc=>{
     state[freq] = Object.assign(freq==="diario"?emptyDiario():emptyList(), doc.exists?doc.data():{});
-    if (currentTab === freq) render();
+    if (currentTab === freq && !isTypingIn(["noteDecision","notePending"])) render();
   }, err=>console.error("Error leyendo agenda:", err));
 }
 ["diario","semanal","mensual"].forEach(subscribeAgenda);
@@ -157,7 +162,8 @@ function subscribeAgenda(freq){
 
 db.collection("gastos").orderBy("fecha","desc").limit(500).onSnapshot(snap=>{
   expenses = snap.docs.map(d=>({id:d.id, ...d.data()}));
-  if (currentTab === "gastos") render();
+  const gastoFields = ["expFecha","expTipo","expCategoria","expSucursal","expMonto","expMetodo","expProveedor","expNotas"];
+  if (currentTab === "gastos" && !isTypingIn(gastoFields)) render();
 }, err=>console.error("Error leyendo gastos:", err));
 
 function saveAgenda(freq){
