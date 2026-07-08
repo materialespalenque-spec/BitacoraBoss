@@ -756,7 +756,8 @@ function stickyCardHtml(nota){
   } else {
     inner = `<textarea class="sticky-texto" data-notatexto="${nota.id}" placeholder="Escribe aquí...">${escapeHtml(nota.contenido)}</textarea>`;
   }
-  return `<div class="sticky-note" style="background:${nota.color||'#F2E14C'};transform:rotate(${rot}deg);">
+  const isEditingThisNota = editingItem && editingItem.notaId === nota.id;
+  return `<div class="sticky-note ${isEditingThisNota?'sticky-note-wide':''}" style="background:${nota.color||'#F2E14C'};transform:rotate(${isEditingThisNota?0:rot}deg);">
     <div class="sticky-share" data-sharenota="${nota.id}" title="Compartir">↗</div>
     <div class="sticky-del" data-delnota="${nota.id}">✕</div>
     ${inner}
@@ -862,6 +863,7 @@ async function addGastoItem(notaId, {monto, cantidad, descripcion}){
 }
 
 async function deleteGastoItem(notaId, idx){
+  if (!confirm("¿Eliminar este gasto de la lista?")) return;
   const nota = notasList.find(n=>n.id===notaId);
   if (!nota) return;
   const items = (nota.items||[]).filter((_,i)=> i!==idx);
