@@ -706,18 +706,20 @@ function stickyCardHtml(nota){
     </div>`;
   } else if (nota.tipo === "gasto"){
     const fmt = n => "$" + Number(n||0).toLocaleString('es-MX',{minimumFractionDigits:2, maximumFractionDigits:2});
-    const total = (nota.items||[]).reduce((s,it)=> s+Number(it.monto||0), 0);
+    const lineTotal = it => Number(it.monto||0) * (Number(it.cantidad) || 1);
+    const total = (nota.items||[]).reduce((s,it)=> s + lineTotal(it), 0);
     inner = `<div class="sticky-title">${escapeHtml(nota.titulo||"Gastos")}</div>
       <div class="sticky-gasto-total">${fmt(total)}</div>`;
     (nota.items||[]).forEach((it,idx)=>{
+      const showQty = it.cantidad && Number(it.cantidad) !== 1;
       inner += `<div class="sticky-gasto-item">
-        <div class="gi-left"><span class="gi-amount">${fmt(it.monto)}</span>${it.cantidad?` × ${escapeHtml(String(it.cantidad))}`:""} ${escapeHtml(it.descripcion||"")}<div class="gi-date">${it.fecha||""}</div></div>
+        <div class="gi-left"><span class="gi-amount">${fmt(lineTotal(it))}</span>${showQty?` <span class="gi-sub">(${fmt(it.monto)} × ${escapeHtml(String(it.cantidad))})</span>`:""} ${escapeHtml(it.descripcion||"")}<div class="gi-date">${it.fecha||""}</div></div>
         <div class="gi-del" data-delgastoitem="${nota.id}" data-idx="${idx}">✕</div>
       </div>`;
     });
     inner += `<div class="sticky-add-gasto">
       <div class="form-row-mini">
-        <input type="number" placeholder="Monto" data-gm="${nota.id}" step="0.01">
+        <input type="number" placeholder="Precio unit." data-gm="${nota.id}" step="0.01">
         <input type="number" placeholder="Cant." data-gc="${nota.id}" step="1">
       </div>
       <input type="text" placeholder="Descripción" data-gd="${nota.id}">
