@@ -841,7 +841,11 @@ function render(){
       el.addEventListener("click", ()=>{ notaTipoActivo = el.dataset.notatipo; render(); });
     });
     content.querySelectorAll("[data-notacolor]").forEach(el=>{
-      el.addEventListener("click", ()=>{ notaColorSeleccionado = el.dataset.notacolor; render(); });
+      el.addEventListener("click", ()=>{
+        notaColorSeleccionado = el.dataset.notacolor;
+        content.querySelectorAll(".color-swatch").forEach(sw=>
+          sw.classList.toggle("selected", sw.dataset.notacolor === notaColorSeleccionado));
+      });
     });
     document.getElementById("btnAddNota").addEventListener("click", addNota);
     content.querySelectorAll("[data-delnota]").forEach(el=>{
