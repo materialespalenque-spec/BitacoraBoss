@@ -107,6 +107,10 @@ let unsub    = { diario:null, semanal:null, mensual:null };
 let unsubNow = { diario:null, semanal:null, mensual:null };
 
 let expenses = [];
+let notasList = [];
+let notaTipoActivo = "checklist";
+let notaColorSeleccionado = "#F2E14C";
+const NOTE_COLORS = ["#F2E14C", "#F7B6C2", "#B8E8C8", "#AEDBF2", "#F7C59F"];
 let currentTab = "diario";
 let expenseFilterTipo = "";
 let expenseFilterSucursal = "";
@@ -165,6 +169,18 @@ db.collection("gastos").orderBy("fecha","desc").limit(500).onSnapshot(snap=>{
   const gastoFields = ["expFecha","expTipo","expCategoria","expSucursal","expMonto","expMetodo","expProveedor","expNotas"];
   if (currentTab === "gastos" && !isTypingIn(gastoFields)) render();
 }, err=>console.error("Error leyendo gastos:", err));
+
+db.collection("notas_rapidas").orderBy("createdAt","desc").onSnapshot(snap=>{
+  notasList = snap.docs.map(d=>({id:d.id, ...d.data()}));
+  const notaFields = ["notaTitulo","notaGastoDesc","notaGastoMonto","notaGastoCantidad","notaGastoFecha","notaTextoInicial"];
+  const activeEl = document.activeElement;
+  const skip = activeEl && (
+    notaFields.includes(activeEl.id) ||
+    (activeEl.classList && activeEl.classList.contains("sticky-texto")) ||
+    (activeEl.hasAttribute && activeEl.hasAttribute("data-additem"))
+  );
+  if (currentTab === "notas" && !skip) render();
+}, err=>console.error("Error leyendo notas:", err));
 
 function saveAgenda(freq){
   const key = getKey(freq, viewDates[freq]);
@@ -639,6 +655,142 @@ async function deleteExpense(id){
 }
 
 // ============================================================
+// Notas rápidas (post-its)
+// ============================================================
+function escapeHtml(str){
+  return String(str||"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function hashRot(id){
+  let h=0; for(let i=0;i<id.length;i++){ h=(h*31+id.charCodeAt(i))|0; }
+  return (Math.abs(h)%7)-3; // -3..3 grados
+}
+
+function renderAddNotaForm(){
+  const typeButtons = [["checklist","Checklist"],["gasto","Gasto"],["texto","Texto"]].map(([key,label])=>
+    `<div class="note-type-tab ${notaTipoActivo===key?'active':''}" data-notatipo="${key}">${label}</div>`).join("");
+  const colorHtml = NOTE_COLORS.map(c=>
+    `<div class="color-swatch ${notaColorSeleccionado===c?'selected':''}" style="background:${c}" data-notacolor="${c}"></div>`).join("");
+
+  let fieldsHtml = "";
+  if (notaTipoActivo === "checklist"){
+    fieldsHtml = `<div class="form-group"><label>Título de la lista</label><input type="text" id="notaTitulo" placeholder="Ej. Súper, Encargos..."></div>`;
+  } else if (notaTipoActivo === "gasto"){
+    fieldsHtml = `
+      <div class="form-row">
+        <div class="form-group"><label>Descripción</label><input type="text" id="notaGastoDesc" placeholder="¿Qué es?"></div>
+        <div class="form-group"><label>Cantidad</label><input type="number" id="notaGastoCantidad" placeholder="1" step="1"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Monto</label><input type="number" id="notaGastoMonto" step="0.01" placeholder="0.00"></div>
+        <div class="form-group"><label>Fecha</label><input type="date" id="notaGastoFecha" value="${dateKey(realToday)}"></div>
+      </div>`;
+  } else {
+    fieldsHtml = `<div class="form-group"><label>Nota</label><textarea id="notaTextoInicial" placeholder="Escribe tu nota..." style="min-height:60px;"></textarea></div>`;
+  }
+
+  return `
+    <div class="expense-form">
+      <div class="note-type-tabs">${typeButtons}</div>
+      ${fieldsHtml}
+      <div class="color-picker">${colorHtml}</div>
+      <button class="btn-primary" id="btnAddNota">Agregar nota</button>
+    </div>
+  `;
+}
+
+function stickyCardHtml(nota){
+  const rot = hashRot(nota.id);
+  let inner = "";
+  if (nota.tipo === "checklist"){
+    inner = `<div class="sticky-title">${escapeHtml(nota.titulo||"Lista")}</div>`;
+    (nota.items||[]).forEach((it,idx)=>{
+      inner += `<div class="sticky-item ${it.done?'done':''}" data-notaid="${nota.id}" data-itemidx="${idx}">
+        <div class="chk">${it.done?'✓':''}</div><div>${escapeHtml(it.text)}</div>
+      </div>`;
+    });
+    inner += `<div class="sticky-add-item">
+      <input type="text" placeholder="+ agregar" data-additem="${nota.id}">
+      <button data-additembtn="${nota.id}">+</button>
+    </div>`;
+  } else if (nota.tipo === "gasto"){
+    const fmt = n => "$" + Number(n||0).toLocaleString('es-MX',{minimumFractionDigits:2, maximumFractionDigits:2});
+    inner = `<div class="sticky-gasto-amount">${fmt(nota.monto)}</div>
+      <div class="sticky-gasto-desc">${nota.cantidad?nota.cantidad+" × ":""}${escapeHtml(nota.descripcion||"")}</div>
+      <div class="sticky-gasto-meta">${nota.fecha||""}</div>`;
+  } else {
+    inner = `<textarea class="sticky-texto" data-notatexto="${nota.id}" placeholder="Escribe aquí...">${escapeHtml(nota.contenido)}</textarea>`;
+  }
+  return `<div class="sticky-note" style="background:${nota.color||'#F2E14C'};transform:rotate(${rot}deg);">
+    <div class="sticky-del" data-delnota="${nota.id}">✕</div>
+    ${inner}
+  </div>`;
+}
+
+function renderNotas(){
+  const cards = notasList.length
+    ? notasList.map(stickyCardHtml).join("")
+    : `<div class="empty-cork">Aún no tienes notas. Agrega tu primera lista, gasto o nota de texto arriba.</div>`;
+  return `${renderAddNotaForm()}<div class="corkboard"><div class="notes-grid">${cards}</div></div>`;
+}
+
+async function addNota(){
+  const btn = document.getElementById("btnAddNota");
+  const data = { tipo: notaTipoActivo, color: notaColorSeleccionado, createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+  if (notaTipoActivo === "checklist"){
+    const titulo = document.getElementById("notaTitulo").value.trim();
+    if (!titulo){ alert("Ponle un título a la lista."); return; }
+    data.titulo = titulo; data.items = [];
+  } else if (notaTipoActivo === "gasto"){
+    const monto = parseFloat(document.getElementById("notaGastoMonto").value);
+    if (!monto || monto <= 0){ alert("Ingresa un monto válido."); return; }
+    data.descripcion = document.getElementById("notaGastoDesc").value.trim();
+    data.cantidad = document.getElementById("notaGastoCantidad").value || "";
+    data.monto = monto;
+    data.fecha = document.getElementById("notaGastoFecha").value || dateKey(realToday);
+  } else {
+    const contenido = document.getElementById("notaTextoInicial").value.trim();
+    if (!contenido){ alert("Escribe algo antes de guardar."); return; }
+    data.contenido = contenido;
+  }
+  btn.disabled = true;
+  try{ await db.collection("notas_rapidas").add(data); }
+  catch(e){ console.error("Error guardando nota:", e); alert("No se pudo guardar."); }
+  btn.disabled = false;
+}
+
+async function deleteNota(id){
+  if (!confirm("¿Eliminar esta nota?")) return;
+  try{ await db.collection("notas_rapidas").doc(id).delete(); }
+  catch(e){ console.error("Error eliminando nota:", e); }
+}
+
+async function toggleChecklistItem(notaId, idx){
+  const nota = notasList.find(n=>n.id===notaId);
+  if (!nota) return;
+  const items = (nota.items||[]).map((it,i)=> i===idx ? {...it, done:!it.done} : it);
+  try{ await db.collection("notas_rapidas").doc(notaId).update({items}); }
+  catch(e){ console.error("Error actualizando item:", e); }
+}
+
+async function addChecklistItem(notaId, text){
+  if (!text || !text.trim()) return;
+  const nota = notasList.find(n=>n.id===notaId);
+  if (!nota) return;
+  const items = [...(nota.items||[]), {text:text.trim(), done:false}];
+  try{ await db.collection("notas_rapidas").doc(notaId).update({items}); }
+  catch(e){ console.error("Error agregando item:", e); }
+}
+
+let textoNotaTimer = {};
+function saveTextoNotaDebounced(notaId, value){
+  clearTimeout(textoNotaTimer[notaId]);
+  textoNotaTimer[notaId] = setTimeout(()=>{
+    db.collection("notas_rapidas").doc(notaId).update({contenido:value})
+      .catch(e=>console.error("Error guardando texto:", e));
+  }, 600);
+}
+
+// ============================================================
 // Render principal
 // ============================================================
 function render(){
@@ -654,6 +806,39 @@ function render(){
       db.collection("agenda").doc(`diario_${key}`).set(emptyDiario());
     };
     renderHistorial();
+    return;
+  }
+
+  if (currentTab === "notas"){
+    content.innerHTML = renderNotas();
+    content.querySelectorAll("[data-notatipo]").forEach(el=>{
+      el.addEventListener("click", ()=>{ notaTipoActivo = el.dataset.notatipo; render(); });
+    });
+    content.querySelectorAll("[data-notacolor]").forEach(el=>{
+      el.addEventListener("click", ()=>{ notaColorSeleccionado = el.dataset.notacolor; render(); });
+    });
+    document.getElementById("btnAddNota").addEventListener("click", addNota);
+    content.querySelectorAll("[data-delnota]").forEach(el=>{
+      el.addEventListener("click", ()=> deleteNota(el.dataset.delnota));
+    });
+    content.querySelectorAll(".sticky-item").forEach(el=>{
+      el.addEventListener("click", ()=> toggleChecklistItem(el.dataset.notaid, parseInt(el.dataset.itemidx,10)));
+    });
+    content.querySelectorAll("[data-additembtn]").forEach(el=>{
+      el.addEventListener("click", ()=>{
+        const input = content.querySelector(`[data-additem="${el.dataset.additembtn}"]`);
+        addChecklistItem(el.dataset.additembtn, input.value);
+        input.value = "";
+      });
+    });
+    content.querySelectorAll("[data-additem]").forEach(el=>{
+      el.addEventListener("keydown", (e)=>{
+        if (e.key === "Enter"){ addChecklistItem(el.dataset.additem, el.value); el.value = ""; }
+      });
+    });
+    content.querySelectorAll("[data-notatexto]").forEach(el=>{
+      el.addEventListener("input", ()=> saveTextoNotaDebounced(el.dataset.notatexto, el.value));
+    });
     return;
   }
 
