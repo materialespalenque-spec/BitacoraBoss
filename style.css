@@ -239,7 +239,9 @@ html,body{margin:0;padding:0;background:var(--navy);color:var(--off);font-family
   content:"";position:absolute;top:-9px;left:50%;transform:translateX(-50%) rotate(-4deg);
   width:36px;height:14px;background:rgba(255,255,255,0.6);box-shadow:0 1px 3px rgba(0,0,0,0.25);
 }
-.sticky-title{font-family:'Oswald',sans-serif;font-weight:600;font-size:15px;margin-bottom:10px;padding-right:16px;}
+.sticky-title{font-family:'Oswald',sans-serif;font-weight:600;font-size:15px;margin-bottom:10px;padding-right:34px;}
+.sticky-share{position:absolute;top:6px;right:32px;cursor:pointer;font-size:16px;color:rgba(43,43,43,0.55);padding:4px;}
+.sticky-share:hover{color:#1a7a4a;}
 .sticky-del{position:absolute;top:6px;right:8px;cursor:pointer;font-size:16px;color:rgba(43,43,43,0.5);padding:4px;}
 .sticky-del:hover{color:#a33;}
 .sticky-item{display:flex;align-items:flex-start;gap:8px;font-size:14.5px;line-height:1.35;margin-bottom:11px;padding:4px 2px;cursor:pointer;}
