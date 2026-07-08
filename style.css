@@ -223,6 +223,7 @@ html,body{margin:0;padding:0;background:var(--navy);color:var(--off);font-family
   box-shadow: inset 0 0 24px rgba(0,0,0,0.35);
 }
 .notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:22px;}
+.sticky-note-wide{grid-column:span 2;}
 .empty-cork{grid-column:1/-1;text-align:center;color:var(--muted);font-size:12.5px;padding:20px 0;}
 
 .sticky-note{
@@ -259,9 +260,12 @@ html,body{margin:0;padding:0;background:var(--navy);color:var(--off);font-family
 .item-save:hover{background:rgba(26,122,74,0.3);}
 .item-cancel:hover{background:rgba(163,51,51,0.3);}
 .edit-input{
-  font-size:13.5px;padding:6px 7px;border:1px solid rgba(43,43,43,0.35);border-radius:4px;background:rgba(255,255,255,0.55);width:100%;
+  font-size:15px;padding:9px 10px;border:1.5px solid rgba(43,43,43,0.4);border-radius:5px;background:rgba(255,255,255,0.65);width:100%;
 }
 .sticky-item.editing .edit-input{flex:1;}
+.sticky-gasto-item.editing{display:flex;flex-direction:column;gap:8px;padding-bottom:12px;}
+.sticky-gasto-item.editing .form-row-mini{gap:8px;}
+.sticky-gasto-item.editing .form-row-mini input{min-width:0;}
 .sticky-add-item{display:flex;gap:5px;margin-top:8px;}
 .sticky-add-item input{
   flex:1;font-size:13.5px;padding:7px 8px;border:1px solid rgba(43,43,43,0.3);border-radius:4px;background:rgba(255,255,255,0.4);
