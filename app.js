@@ -110,6 +110,7 @@ let expenses = [];
 let notasList = [];
 let notaTipoActivo = "checklist";
 let notaColorSeleccionado = "#F2E14C";
+let editingItem = null; // {notaId, idx, tipo:"checklist"|"gasto"}
 const NOTE_COLORS = ["#F2E14C", "#F7B6C2", "#B8E8C8", "#AEDBF2", "#F7C59F"];
 let currentTab = "diario";
 let expenseFilterTipo = "";
@@ -179,7 +180,7 @@ db.collection("notas_rapidas").orderBy("createdAt","desc").onSnapshot(snap=>{
     (activeEl.classList && activeEl.classList.contains("sticky-texto")) ||
     (activeEl.hasAttribute && (activeEl.hasAttribute("data-additem") || activeEl.hasAttribute("data-gm") || activeEl.hasAttribute("data-gc") || activeEl.hasAttribute("data-gd")))
   );
-  if (currentTab === "notas" && !skip) render();
+  if (currentTab === "notas" && !skip && !editingItem) render();
 }, err=>console.error("Error leyendo notas:", err));
 
 function saveAgenda(freq){
@@ -696,9 +697,20 @@ function stickyCardHtml(nota){
   if (nota.tipo === "checklist"){
     inner = `<div class="sticky-title">${escapeHtml(nota.titulo||"Lista")}</div>`;
     (nota.items||[]).forEach((it,idx)=>{
-      inner += `<div class="sticky-item ${it.done?'done':''}" data-notaid="${nota.id}" data-itemidx="${idx}">
-        <div class="chk">${it.done?'✓':''}</div><div>${escapeHtml(it.text)}</div>
-      </div>`;
+      const isEditing = editingItem && editingItem.notaId===nota.id && editingItem.tipo==="checklist" && editingItem.idx===idx;
+      if (isEditing){
+        inner += `<div class="sticky-item editing">
+          <input type="text" class="edit-input" value="${escapeHtml(it.text)}" data-editchecklistinput="${nota.id}:${idx}">
+          <div class="item-save" data-saveeditchecklist="${nota.id}:${idx}">✓</div>
+          <div class="item-cancel" data-canceledit="1">✕</div>
+        </div>`;
+      } else {
+        inner += `<div class="sticky-item ${it.done?'done':''}" data-notaid="${nota.id}" data-itemidx="${idx}">
+          <div class="chk">${it.done?'✓':''}</div>
+          <div class="item-text">${escapeHtml(it.text)}</div>
+          <div class="item-edit" data-editchecklist="${nota.id}:${idx}">✎</div>
+        </div>`;
+      }
     });
     inner += `<div class="sticky-add-item">
       <input type="text" placeholder="+ agregar" data-additem="${nota.id}">
@@ -711,11 +723,27 @@ function stickyCardHtml(nota){
     inner = `<div class="sticky-title">${escapeHtml(nota.titulo||"Gastos")}</div>
       <div class="sticky-gasto-total">${fmt(total)}</div>`;
     (nota.items||[]).forEach((it,idx)=>{
-      const showQty = it.cantidad && Number(it.cantidad) !== 1;
-      inner += `<div class="sticky-gasto-item">
-        <div class="gi-left"><span class="gi-amount">${fmt(lineTotal(it))}</span>${showQty?` <span class="gi-sub">(${fmt(it.monto)} × ${escapeHtml(String(it.cantidad))})</span>`:""} ${escapeHtml(it.descripcion||"")}<div class="gi-date">${it.fecha||""}</div></div>
-        <div class="gi-del" data-delgastoitem="${nota.id}" data-idx="${idx}">✕</div>
-      </div>`;
+      const isEditing = editingItem && editingItem.notaId===nota.id && editingItem.tipo==="gasto" && editingItem.idx===idx;
+      if (isEditing){
+        inner += `<div class="sticky-gasto-item editing">
+          <div class="form-row-mini">
+            <input type="number" class="edit-input" placeholder="Precio unit." value="${it.monto||''}" data-editgm="${nota.id}:${idx}" step="0.01">
+            <input type="number" class="edit-input" placeholder="Cant." value="${it.cantidad||''}" data-editgc="${nota.id}:${idx}" step="1">
+          </div>
+          <input type="text" class="edit-input" placeholder="Descripción" value="${escapeHtml(it.descripcion||'')}" data-editgd="${nota.id}:${idx}">
+          <div style="display:flex;gap:6px;">
+            <div class="item-save" data-saveeditgasto="${nota.id}:${idx}">✓ Guardar</div>
+            <div class="item-cancel" data-canceledit="1">✕</div>
+          </div>
+        </div>`;
+      } else {
+        const showQty = it.cantidad && Number(it.cantidad) !== 1;
+        inner += `<div class="sticky-gasto-item">
+          <div class="gi-left"><span class="gi-amount">${fmt(lineTotal(it))}</span>${showQty?` <span class="gi-sub">(${fmt(it.monto)} × ${escapeHtml(String(it.cantidad))})</span>`:""} ${escapeHtml(it.descripcion||"")}<div class="gi-date">${it.fecha||""}</div></div>
+          <div class="gi-edit" data-editgasto="${nota.id}:${idx}">✎</div>
+          <div class="gi-del" data-delgastoitem="${nota.id}" data-idx="${idx}">✕</div>
+        </div>`;
+      }
     });
     inner += `<div class="sticky-add-gasto">
       <div class="form-row-mini">
@@ -841,6 +869,34 @@ async function deleteGastoItem(notaId, idx){
   catch(e){ console.error("Error eliminando gasto:", e); }
 }
 
+function saveChecklistItemEdit(notaId, idx, newText){
+  const nota = notasList.find(n=>n.id===notaId);
+  if (!nota) return;
+  const text = newText.trim();
+  if (!text){ editingItem = null; render(); return; }
+  nota.items = (nota.items||[]).map((it,i)=> i===idx ? {...it, text} : it);
+  editingItem = null;
+  render();
+  db.collection("notas_rapidas").doc(notaId).update({items: nota.items})
+    .catch(e=>console.error("Error editando item:", e));
+}
+
+function saveGastoItemEdit(notaId, idx, {monto, cantidad, descripcion}){
+  const nota = notasList.find(n=>n.id===notaId);
+  if (!nota) return;
+  if (!monto || monto <= 0){ alert("Ingresa un monto válido."); return; }
+  nota.items = (nota.items||[]).map((it,i)=> i===idx ? {...it, monto:Number(monto), cantidad:cantidad||"", descripcion:descripcion||""} : it);
+  editingItem = null;
+  render();
+  db.collection("notas_rapidas").doc(notaId).update({items: nota.items})
+    .catch(e=>console.error("Error editando gasto:", e));
+}
+
+function cancelEdit(){
+  editingItem = null;
+  render();
+}
+
 let textoNotaTimer = {};
 function saveTextoNotaDebounced(notaId, value){
   clearTimeout(textoNotaTimer[notaId]);
@@ -889,7 +945,11 @@ function render(){
       el.addEventListener("click", ()=> shareNota(el.dataset.sharenota));
     });
     content.querySelectorAll(".sticky-item").forEach(el=>{
-      el.addEventListener("click", ()=> toggleChecklistItem(el.dataset.notaid, parseInt(el.dataset.itemidx,10)));
+      el.addEventListener("click", (e)=>{
+        if (e.target.closest(".item-edit")) return;
+        if (!el.dataset.notaid) return;
+        toggleChecklistItem(el.dataset.notaid, parseInt(el.dataset.itemidx,10));
+      });
     });
     content.querySelectorAll("[data-additembtn]").forEach(el=>{
       el.addEventListener("click", ()=>{
@@ -915,6 +975,48 @@ function render(){
     });
     content.querySelectorAll("[data-delgastoitem]").forEach(el=>{
       el.addEventListener("click", ()=> deleteGastoItem(el.dataset.delgastoitem, parseInt(el.dataset.idx,10)));
+    });
+    content.querySelectorAll("[data-editchecklist]").forEach(el=>{
+      el.addEventListener("click", ()=>{
+        const [notaId, idx] = el.dataset.editchecklist.split(":");
+        editingItem = {notaId, idx:parseInt(idx,10), tipo:"checklist"};
+        render();
+      });
+    });
+    content.querySelectorAll("[data-saveeditchecklist]").forEach(el=>{
+      el.addEventListener("click", ()=>{
+        const [notaId, idx] = el.dataset.saveeditchecklist.split(":");
+        const input = content.querySelector(`[data-editchecklistinput="${notaId}:${idx}"]`);
+        saveChecklistItemEdit(notaId, parseInt(idx,10), input.value);
+      });
+    });
+    content.querySelectorAll("[data-editchecklistinput]").forEach(el=>{
+      el.addEventListener("keydown", (e)=>{
+        if (e.key === "Enter"){
+          const [notaId, idx] = el.dataset.editchecklistinput.split(":");
+          saveChecklistItemEdit(notaId, parseInt(idx,10), el.value);
+        }
+        if (e.key === "Escape") cancelEdit();
+      });
+    });
+    content.querySelectorAll("[data-editgasto]").forEach(el=>{
+      el.addEventListener("click", ()=>{
+        const [notaId, idx] = el.dataset.editgasto.split(":");
+        editingItem = {notaId, idx:parseInt(idx,10), tipo:"gasto"};
+        render();
+      });
+    });
+    content.querySelectorAll("[data-saveeditgasto]").forEach(el=>{
+      el.addEventListener("click", ()=>{
+        const [notaId, idx] = el.dataset.saveeditgasto.split(":");
+        const m = content.querySelector(`[data-editgm="${notaId}:${idx}"]`);
+        const c = content.querySelector(`[data-editgc="${notaId}:${idx}"]`);
+        const d = content.querySelector(`[data-editgd="${notaId}:${idx}"]`);
+        saveGastoItemEdit(notaId, parseInt(idx,10), {monto:parseFloat(m.value), cantidad:c.value, descripcion:d.value});
+      });
+    });
+    content.querySelectorAll("[data-canceledit]").forEach(el=>{
+      el.addEventListener("click", cancelEdit);
     });
     content.querySelectorAll("[data-notatexto]").forEach(el=>{
       el.addEventListener("input", ()=> saveTextoNotaDebounced(el.dataset.notatexto, el.value));
