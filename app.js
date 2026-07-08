@@ -19,34 +19,41 @@ const MOMENTO_ORDER = ["manana","mediodia","tarde"];
 
 const TASKS = {
   diario: [
-    {id:"d1", area:"fin",      momento:"manana",   text:"Revisar corte de caja del día anterior (Periférico y Libertad)"},
-    {id:"d3", area:"compras",  momento:"manana",   text:"Revisar alertas de stock crítico (SKUs clase A)"},
-    {id:"d4", area:"ops",      momento:"manana",   text:"Recorrido o revisión remota de ambas sucursales"},
-    {id:"d7", area:"personal", momento:"manana",   text:"Check-in breve con encargados de sucursal"},
-    {id:"d6", area:"ventas",   momento:"mediodia", text:"Seguimiento a cotizaciones grandes o clientes clave del día"},
-    {id:"d5", area:"ops",      momento:"mediodia", text:"Revisar folios de entrega pendientes o duplicados"},
-    {id:"d8", area:"estr",     momento:"mediodia", text:"Bloque de tiempo protegido para proyecto en curso (POS, etc.)"},
+    {id:"d1", area:"fin",      momento:"manana",   text:"Revisar reporte de cierre de caja de ambas sucursales (detectar diferencias, no contar tú)"},
+    {id:"d3", area:"compras",  momento:"manana",   text:"Revisar alertas de stock crítico y autorizar compras que lo requieran"},
+    {id:"d6", area:"ops",      momento:"mediodia", text:"Revisar avance de entregas del día (folios pendientes o con demora) y corregir a tiempo si hay algún problema"},
+    {id:"d10",area:"personal", momento:"mediodia", text:"Resolver temas escalados por encargados (decisiones fuera de su autonomía)"},
     {id:"d2", area:"fin",      momento:"tarde",    text:"Revisar efectivo disponible vs. pagos programados de mañana"},
     {id:"d9", area:"dev",      momento:"tarde",    text:"Avance de estudio (ISEI / IEU) — mínimo 20 min"},
   ],
   semanal: [
-    {id:"s1", area:"fin", text:"Revisar dashboard financiero (KPIs y semáforos) vs. meta del mes"},
-    {id:"s2", area:"compras", text:"Contacto con al menos un proveedor clave (crédito / precio)"},
-    {id:"s3", area:"compras", text:"Revisar inventario clase A+B contra lista de 85 SKUs"},
-    {id:"s4", area:"personal", text:"Reunión breve de equipo (una o ambas sucursales)"},
+    {id:"s4", area:"fin", text:"Revisar dashboard financiero (KPIs y semáforos) vs. meta del mes"},
     {id:"s5", area:"ventas", text:"Revisar cartera de crédito a clientes (meta: reducirla a cero)"},
-    {id:"s6", area:"ops", text:"Revisar métricas de flotilla / entregas / fletes"},
-    {id:"s7", area:"estr", text:"Revisar avance de metas semanales y ajustar prioridades"},
+    {id:"s1", area:"personal", text:"Reunión con encargados — enfocada en resultados y excepciones"},
+    {id:"s2", area:"ops", text:"__ROTATIVA__"},
+    {id:"s3", area:"compras", text:"Contacto con al menos un proveedor clave (crédito / precio)"},
+    {id:"s6", area:"estr", text:"Revisar avance de metas estratégicas y ajustar prioridades"},
+    {id:"s7", area:"estr", text:"Bloque de tiempo protegido para proyecto estratégico (POS, etc.)"},
   ],
   mensual: [
     {id:"m1", area:"fin", text:"Cerrar y analizar estado de resultados del mes (ambas sucursales)"},
     {id:"m2", area:"fin", text:"Comparar presupuesto vs. real y actualizar proyecciones"},
     {id:"m3", area:"compras", text:"Revisar mezcla de ventas (construcción vs. ferretería) hacia 50/50"},
-    {id:"m4", area:"personal", text:"Evaluación breve de desempeño con encargados"},
-    {id:"m5", area:"estr", text:"Sesión de planeación mensual — revisar hoja de ruta a 12 meses"},
+    {id:"m4", area:"personal", text:"Evaluar desarrollo de tus encargados (¿listos para más autonomía?)"},
+    {id:"m5", area:"estr", text:"Sesión de planeación estratégica — revisar hoja de ruta a 12 meses"},
+    {id:"m8", area:"estr", text:"Revisar si algo se degradó este mes por falta de seguimiento del sistema de delegación"},
     {id:"m6", area:"dev", text:"Revisar avance ISEI / explorar siguiente paso hacia IEU"},
   ]
 };
+
+// Rotación de auditoría semanal (tarea s2): cambia automáticamente cada semana
+const AUDIT_ITEMS = ["Merchandising", "Cobro contra entrega", "Folios", "Inventario clase A+B", "Tiempos de entrega"];
+function getRotativaLabel(weekDate){
+  const wk = weekKey(weekDate); // "YYYY-Wnn"
+  const wn = parseInt(wk.split("-W")[1], 10);
+  const item = AUDIT_ITEMS[(wn-1) % AUDIT_ITEMS.length];
+  return `Auditoría rotativa de política operativa — esta semana: ${item}`;
+}
 
 const CATEGORIAS = {
   proveedor: ["Materiales de construcción", "Ferretería / Insumos", "Flete de proveedor", "Otro"],
@@ -352,9 +359,10 @@ function renderChecklistPeriodic(freq){
     html += `<div class="area-block"><div class="area-label">${AREAS[areaKey].label}</div>`;
     grouped[areaKey].forEach(t=>{
       const done = (state[freq].done||[]).includes(t.id);
+      const text = (freq==="semanal" && t.text==="__ROTATIVA__") ? getRotativaLabel(viewDates.semanal) : t.text;
       html += `<div class="task ${done?'done':''}" data-freq="${freq}" data-id="${t.id}">
         <div class="stamp">${done?'✓':''}</div>
-        <div class="task-text">${t.text}</div>
+        <div class="task-text">${text}</div>
       </div>`;
     });
     html += `</div>`;
