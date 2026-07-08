@@ -245,9 +245,23 @@ html,body{margin:0;padding:0;background:var(--navy);color:var(--off);font-family
 .sticky-del{position:absolute;top:6px;right:8px;cursor:pointer;font-size:16px;color:rgba(43,43,43,0.5);padding:4px;}
 .sticky-del:hover{color:#a33;}
 .sticky-item{display:flex;align-items:flex-start;gap:8px;font-size:14.5px;line-height:1.35;margin-bottom:11px;padding:4px 2px;cursor:pointer;}
+.sticky-item.editing{cursor:default;}
 .sticky-item .chk{width:18px;height:18px;border:1.5px solid rgba(43,43,43,0.5);border-radius:4px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:12px;}
+.sticky-item .item-text{flex:1;}
 .sticky-item.done{opacity:0.55;text-decoration:line-through;}
 .sticky-item.done .chk{background:rgba(43,43,43,0.5);color:#fff;}
+.item-edit, .gi-edit{cursor:pointer;opacity:0.5;flex-shrink:0;font-size:14px;padding:2px 4px;}
+.item-edit:hover, .gi-edit:hover{opacity:1;}
+.item-save, .item-cancel{
+  font-size:12px;font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:0.3px;
+  cursor:pointer;padding:5px 9px;border-radius:4px;background:rgba(43,43,43,0.15);flex-shrink:0;
+}
+.item-save:hover{background:rgba(26,122,74,0.3);}
+.item-cancel:hover{background:rgba(163,51,51,0.3);}
+.edit-input{
+  font-size:13.5px;padding:6px 7px;border:1px solid rgba(43,43,43,0.35);border-radius:4px;background:rgba(255,255,255,0.55);width:100%;
+}
+.sticky-item.editing .edit-input{flex:1;}
 .sticky-add-item{display:flex;gap:5px;margin-top:8px;}
 .sticky-add-item input{
   flex:1;font-size:13.5px;padding:7px 8px;border:1px solid rgba(43,43,43,0.3);border-radius:4px;background:rgba(255,255,255,0.4);
