@@ -24,7 +24,7 @@ const TASKS = {
     {id:"d6", area:"ops",      momento:"mediodia", text:"Revisar avance de entregas del día (folios pendientes o con demora) y corregir a tiempo si hay algún problema"},
     {id:"d10",area:"personal", momento:"mediodia", text:"Resolver temas escalados por encargados (decisiones fuera de su autonomía)"},
     {id:"d2", area:"fin",      momento:"tarde",    text:"Revisar efectivo disponible vs. pagos programados de mañana"},
-    {id:"d9", area:"dev",      momento:"tarde",    text:"Avance de estudio (ISEI / IEU) — mínimo 20 min"},
+    {id:"d11",area:"ops",      momento:"tarde",    text:"Dejar programadas y enviadas las notas de entrega (folios) para mañana"},
   ],
   semanal: [
     {id:"s4", area:"fin", text:"Revisar dashboard financiero (KPIs y semáforos) vs. meta del mes"},
@@ -34,6 +34,7 @@ const TASKS = {
     {id:"s3", area:"compras", text:"Contacto con al menos un proveedor clave (crédito / precio)"},
     {id:"s6", area:"estr", text:"Revisar avance de metas estratégicas y ajustar prioridades"},
     {id:"s7", area:"estr", text:"Bloque de tiempo protegido para proyecto estratégico (POS, etc.)"},
+    {id:"s9", area:"dev", text:"Avance de estudio (ISEI / IEU) — sesión semanal"},
   ],
   mensual: [
     {id:"m1", area:"fin", text:"Cerrar y analizar estado de resultados del mes (ambas sucursales)"},
