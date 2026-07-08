@@ -177,7 +177,7 @@ db.collection("notas_rapidas").orderBy("createdAt","desc").onSnapshot(snap=>{
   const skip = activeEl && (
     notaFields.includes(activeEl.id) ||
     (activeEl.classList && activeEl.classList.contains("sticky-texto")) ||
-    (activeEl.hasAttribute && activeEl.hasAttribute("data-additem"))
+    (activeEl.hasAttribute && (activeEl.hasAttribute("data-additem") || activeEl.hasAttribute("data-gm") || activeEl.hasAttribute("data-gc") || activeEl.hasAttribute("data-gd")))
   );
   if (currentTab === "notas" && !skip) render();
 }, err=>console.error("Error leyendo notas:", err));
@@ -675,15 +675,7 @@ function renderAddNotaForm(){
   if (notaTipoActivo === "checklist"){
     fieldsHtml = `<div class="form-group"><label>Título de la lista</label><input type="text" id="notaTitulo" placeholder="Ej. Súper, Encargos..."></div>`;
   } else if (notaTipoActivo === "gasto"){
-    fieldsHtml = `
-      <div class="form-row">
-        <div class="form-group"><label>Descripción</label><input type="text" id="notaGastoDesc" placeholder="¿Qué es?"></div>
-        <div class="form-group"><label>Cantidad</label><input type="number" id="notaGastoCantidad" placeholder="1" step="1"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label>Monto</label><input type="number" id="notaGastoMonto" step="0.01" placeholder="0.00"></div>
-        <div class="form-group"><label>Fecha</label><input type="date" id="notaGastoFecha" value="${dateKey(realToday)}"></div>
-      </div>`;
+    fieldsHtml = `<div class="form-group"><label>Nombre de la lista de gasto</label><input type="text" id="notaTitulo" placeholder="Ej. Gasolina camioneta, Viáticos evento..."></div>`;
   } else {
     fieldsHtml = `<div class="form-group"><label>Nota</label><textarea id="notaTextoInicial" placeholder="Escribe tu nota..." style="min-height:60px;"></textarea></div>`;
   }
@@ -714,9 +706,23 @@ function stickyCardHtml(nota){
     </div>`;
   } else if (nota.tipo === "gasto"){
     const fmt = n => "$" + Number(n||0).toLocaleString('es-MX',{minimumFractionDigits:2, maximumFractionDigits:2});
-    inner = `<div class="sticky-gasto-amount">${fmt(nota.monto)}</div>
-      <div class="sticky-gasto-desc">${nota.cantidad?nota.cantidad+" × ":""}${escapeHtml(nota.descripcion||"")}</div>
-      <div class="sticky-gasto-meta">${nota.fecha||""}</div>`;
+    const total = (nota.items||[]).reduce((s,it)=> s+Number(it.monto||0), 0);
+    inner = `<div class="sticky-title">${escapeHtml(nota.titulo||"Gastos")}</div>
+      <div class="sticky-gasto-total">${fmt(total)}</div>`;
+    (nota.items||[]).forEach((it,idx)=>{
+      inner += `<div class="sticky-gasto-item">
+        <div class="gi-left"><span class="gi-amount">${fmt(it.monto)}</span>${it.cantidad?` × ${escapeHtml(String(it.cantidad))}`:""} ${escapeHtml(it.descripcion||"")}<div class="gi-date">${it.fecha||""}</div></div>
+        <div class="gi-del" data-delgastoitem="${nota.id}" data-idx="${idx}">✕</div>
+      </div>`;
+    });
+    inner += `<div class="sticky-add-gasto">
+      <div class="form-row-mini">
+        <input type="number" placeholder="Monto" data-gm="${nota.id}" step="0.01">
+        <input type="number" placeholder="Cant." data-gc="${nota.id}" step="1">
+      </div>
+      <input type="text" placeholder="Descripción" data-gd="${nota.id}">
+      <button data-addgastobtn="${nota.id}">+ Agregar gasto</button>
+    </div>`;
   } else {
     inner = `<textarea class="sticky-texto" data-notatexto="${nota.id}" placeholder="Escribe aquí...">${escapeHtml(nota.contenido)}</textarea>`;
   }
@@ -727,26 +733,25 @@ function stickyCardHtml(nota){
 }
 
 function renderNotas(){
-  const cards = notasList.length
-    ? notasList.map(stickyCardHtml).join("")
-    : `<div class="empty-cork">Aún no tienes notas. Agrega tu primera lista, gasto o nota de texto arriba.</div>`;
+  const filtered = notasList.filter(n => n.tipo === notaTipoActivo);
+  const emptyMsgs = {
+    checklist: "Aún no tienes listas. Agrega tu primera (súper, encargos, etc.) arriba.",
+    gasto: "Aún no tienes listas de gasto. Créala arriba y ve agregando gastos conforme salgan.",
+    texto: "Aún no tienes notas de texto. Escribe la primera arriba."
+  };
+  const cards = filtered.length
+    ? filtered.map(stickyCardHtml).join("")
+    : `<div class="empty-cork">${emptyMsgs[notaTipoActivo]}</div>`;
   return `${renderAddNotaForm()}<div class="corkboard"><div class="notes-grid">${cards}</div></div>`;
 }
 
 async function addNota(){
   const btn = document.getElementById("btnAddNota");
   const data = { tipo: notaTipoActivo, color: notaColorSeleccionado, createdAt: firebase.firestore.FieldValue.serverTimestamp() };
-  if (notaTipoActivo === "checklist"){
+  if (notaTipoActivo === "checklist" || notaTipoActivo === "gasto"){
     const titulo = document.getElementById("notaTitulo").value.trim();
-    if (!titulo){ alert("Ponle un título a la lista."); return; }
+    if (!titulo){ alert("Ponle un nombre a la lista."); return; }
     data.titulo = titulo; data.items = [];
-  } else if (notaTipoActivo === "gasto"){
-    const monto = parseFloat(document.getElementById("notaGastoMonto").value);
-    if (!monto || monto <= 0){ alert("Ingresa un monto válido."); return; }
-    data.descripcion = document.getElementById("notaGastoDesc").value.trim();
-    data.cantidad = document.getElementById("notaGastoCantidad").value || "";
-    data.monto = monto;
-    data.fecha = document.getElementById("notaGastoFecha").value || dateKey(realToday);
   } else {
     const contenido = document.getElementById("notaTextoInicial").value.trim();
     if (!contenido){ alert("Escribe algo antes de guardar."); return; }
@@ -779,6 +784,25 @@ async function addChecklistItem(notaId, text){
   const items = [...(nota.items||[]), {text:text.trim(), done:false}];
   try{ await db.collection("notas_rapidas").doc(notaId).update({items}); }
   catch(e){ console.error("Error agregando item:", e); }
+}
+
+async function addGastoItem(notaId, {monto, cantidad, descripcion}){
+  if (!monto || monto <= 0) { alert("Ingresa un monto válido."); return; }
+  const nota = notasList.find(n=>n.id===notaId);
+  if (!nota) return;
+  const items = [...(nota.items||[]), {
+    monto: Number(monto), cantidad: cantidad||"", descripcion: descripcion||"", fecha: dateKey(new Date())
+  }];
+  try{ await db.collection("notas_rapidas").doc(notaId).update({items}); }
+  catch(e){ console.error("Error agregando gasto:", e); }
+}
+
+async function deleteGastoItem(notaId, idx){
+  const nota = notasList.find(n=>n.id===notaId);
+  if (!nota) return;
+  const items = (nota.items||[]).filter((_,i)=> i!==idx);
+  try{ await db.collection("notas_rapidas").doc(notaId).update({items}); }
+  catch(e){ console.error("Error eliminando gasto:", e); }
 }
 
 let textoNotaTimer = {};
@@ -835,6 +859,19 @@ function render(){
       el.addEventListener("keydown", (e)=>{
         if (e.key === "Enter"){ addChecklistItem(el.dataset.additem, el.value); el.value = ""; }
       });
+    });
+    content.querySelectorAll("[data-addgastobtn]").forEach(el=>{
+      el.addEventListener("click", ()=>{
+        const id = el.dataset.addgastobtn;
+        const montoEl = content.querySelector(`[data-gm="${id}"]`);
+        const cantEl = content.querySelector(`[data-gc="${id}"]`);
+        const descEl = content.querySelector(`[data-gd="${id}"]`);
+        addGastoItem(id, {monto: parseFloat(montoEl.value), cantidad: cantEl.value, descripcion: descEl.value});
+        montoEl.value = ""; cantEl.value = ""; descEl.value = "";
+      });
+    });
+    content.querySelectorAll("[data-delgastoitem]").forEach(el=>{
+      el.addEventListener("click", ()=> deleteGastoItem(el.dataset.delgastoitem, parseInt(el.dataset.idx,10)));
     });
     content.querySelectorAll("[data-notatexto]").forEach(el=>{
       el.addEventListener("input", ()=> saveTextoNotaDebounced(el.dataset.notatexto, el.value));
